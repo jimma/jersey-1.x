@@ -39,18 +39,26 @@
  */
 package com.sun.jersey.core.spi.scanning.uri;
 
-import com.sun.jersey.core.spi.scanning.JarFileScanner;
-import com.sun.jersey.core.spi.scanning.ScannerException;
-import com.sun.jersey.core.spi.scanning.ScannerListener;
+import java.io.File;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+
 import javax.ws.rs.core.UriBuilder;
+
+import org.jboss.vfs.VFS;
+import org.jboss.vfs.VirtualFile;
+
+import com.sun.jersey.core.spi.scanning.FilesScanner;
+import com.sun.jersey.core.spi.scanning.JarFileScanner;
+import com.sun.jersey.core.spi.scanning.ScannerException;
+import com.sun.jersey.core.spi.scanning.ScannerListener;
 
 /**
  * A JBoss-based "vfsfile", "vfs" and "vfszip" scheme URI scanner.
@@ -66,7 +74,7 @@ public class VfsSchemeScanner implements UriSchemeScanner {
     // UriSchemeScanner
     
     public void scan(final URI u, final ScannerListener sl) {
-        if (!u.getScheme().equalsIgnoreCase("vfszip")) {
+        if (!u.getScheme().equalsIgnoreCase("vfszip") && !u.getScheme().equalsIgnoreCase("vfs")) {
             new FileSchemeScanner().scan(
                     UriBuilder.fromUri(u).scheme("file").build(),
                     sl);
@@ -110,10 +118,19 @@ public class VfsSchemeScanner implements UriSchemeScanner {
                     }
                 } else {
                     try {
+                    	if (war.startsWith("vsfzip")) {
                         JarFileScanner.scan(new URL(war.replace("vfszip", "file")).openStream(), path, sl);
-                    } catch (IOException ex) {
-                        throw new ScannerException("IO error when scanning war " + u, ex);
-                    }
+                    	}
+                    	if (war.startsWith("vfs")) {
+                    		VirtualFile vitualFile = VFS.getChild(u);
+                    		FilesScanner fileScanner = new FilesScanner(new File[]{vitualFile.getPhysicalFile()});
+                    		fileScanner.scan(sl);
+                    	}
+					} catch (MalformedURLException e) {
+						throw new ScannerException("MalformedURL error when scanning war " + u, e);
+					} catch (IOException e) {
+						throw new ScannerException("IO error when scanning war " + u, e);
+					}
                 }
             } else {
                 try {
